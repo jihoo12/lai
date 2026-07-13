@@ -103,7 +103,7 @@ impl LlmBackend for LlamaCppBackend {
             stream: false,
         };
 
-        let url = format!("{}/v1/chat/completions", self.url);
+        let url = format!("{}/chat/completions", self.url);
         let mut resp = self
             .agent
             .post(&url)
@@ -135,7 +135,7 @@ impl LlmBackend for LlamaCppBackend {
             stream: true,
         };
 
-        let url = format!("{}/v1/chat/completions", self.url);
+        let url = format!("{}/chat/completions", self.url);
         let mut resp = self
             .agent
             .post(&url)

@@ -49,7 +49,7 @@ fn main() {
         Some("--openai") => {
             let url = args.get(2).cloned().unwrap_or_else(|| {
                 std::env::var("OPENAI_API_BASE")
-                    .unwrap_or_else(|_| "https://api.openai.com".to_string())
+                    .unwrap_or_else(|_| "https://api.openai.com/v1".to_string())
             });
             let model = args.get(3).cloned().unwrap_or_else(|| {
                 std::env::var("OPENAI_MODEL")

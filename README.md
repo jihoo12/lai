@@ -30,7 +30,23 @@ cargo run -- --llama http://localhost:8080 local
 
 ```bash
 export OPENAI_API_KEY=sk-...
-cargo run -- --openai https://api.openai.com gpt-4o
+cargo run -- --openai https://api.openai.com/v1 gpt-4o
+```
+
+### With OpenRouter
+
+```bash
+export OPENAI_API_KEY=your-openrouter-key
+cargo run -- --openai https://openrouter.ai/api/v1 anthropic/claude-3.5-sonnet
+```
+
+Or in `~/.lai/config.toml`:
+
+```toml
+[backend]
+type = "openai"
+url = "https://openrouter.ai/api/v1"
+model = "anthropic/claude-3.5-sonnet"
 ```
 
 ## Configuration
@@ -40,7 +56,7 @@ Create `~/.lai/config.toml`:
 ```toml
 [backend]
 type = "openai"        # "llama" or "openai"
-url = "https://api.openai.com"
+url = "https://api.openai.com/v1"  # or https://openrouter.ai/api/v1
 model = "gpt-4o"
 temperature = 0.7
 max_tokens = 4096

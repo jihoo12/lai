@@ -119,7 +119,7 @@ impl OpenAIBackend {
             stream,
         };
 
-        let url = format!("{}/v1/chat/completions", self.url);
+        let url = format!("{}/chat/completions", self.url);
         let resp = self
             .agent
             .post(&url)

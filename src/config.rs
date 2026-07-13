@@ -64,7 +64,7 @@ fn default_backend_type() -> String {
     "llama".to_string()
 }
 fn default_llama_url() -> String {
-    "http://localhost:8080".to_string()
+    "http://localhost:8080/v1".to_string()
 }
 fn default_model() -> String {
     "local".to_string()
