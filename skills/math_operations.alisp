@@ -1,4 +1,0 @@
-(defn square (x) (* x x))
-        (defn cube (x) (* x x x))
-        (defn is-even? (x) (= (rem x 2) 0))
-        (println "Math operations skill loaded.")

@@ -1,223 +1,33 @@
 # lai
 
-AI agent that uses alisp
+AI agent powered by Lisp. No JSON schemas, no function definitions — just alisp.
 
-The model thinks, generates alisp code, executes it, and feeds results back. No JSON schemas, no function definitions — just Lisp.
-
-## Quick Start
+## Install
 
 ```bash
 cargo build --release
 ```
 
-### Interactive mode (stdin)
+## Usage
 
 ```bash
+# Interactive (paste your own LLM responses)
 cargo run
-```
 
-### With llama.cpp
-
-```bash
-# Start llama.cpp with an OpenAI-compatible endpoint
-llama-server -m model.gguf --port 8080
-
-# Connect lai
+# llama.cpp
 cargo run -- --llama http://localhost:8080 local
-```
 
-### With OpenAI
+# OpenAI
+OPENAI_API_KEY=sk-... cargo run -- --openai https://api.openai.com/v1 gpt-4o
 
-```bash
-export OPENAI_API_KEY=sk-...
-cargo run -- --openai https://api.openai.com/v1 gpt-4o
-```
-
-### With OpenRouter
-
-```bash
-export OPENAI_API_KEY=your-openrouter-key
-cargo run -- --openai https://openrouter.ai/api/v1 anthropic/claude-3.5-sonnet
-```
-
-Or in `~/.lai/config.alisp`:
-
-```lisp
-(def backend-type "openai")
-(def backend-url "https://openrouter.ai/api/v1")
-(def backend-model "anthropic/claude-3.5-sonnet")
-```
-
-## Configuration
-
-lai looks for config in this order:
-1. `lai.alisp` in the current directory
-2. `lai.alisp` in parent directories (walks up to `/`)
-3. `~/.lai/config.alisp` (global fallback)
-
-Create a `lai.alisp` in your project root:
-
-```lisp
-;; Backend
-(def backend-type "openai")
-(def backend-url "https://openrouter.ai/api/v1")
-(def backend-model "anthropic/claude-3.5-sonnet")
-(def backend-temperature 0.7)
-(def backend-max-tokens 4096)
-
-;; Agent
-(def agent-max-turns 20)
-(def agent-max-context-tokens 8192)
-
-;; Security
-(def security-mode "Confirm")
-(def security-allow-network true)
-```
-
-Environment variables:
-- `OPENAI_API_KEY` — API key for OpenAI
-- `OPENAI_API_BASE` — Custom API base URL
-- `OPENAI_MODEL` — Model name
-
-## Skills
-
-Skills extend the agent with custom functions and instructions. Place `.alisp` or `.json` files in `~/.lai/skills/` or `./skills/`.
-
-### alisp format
-
-```lisp
-; name: git
-; description: Git repository operations
-; prompt: You are a git expert. Use (git-status), (git-diff), etc.
-
-(defn git-status ()
-  (exec "git status"))
-
-(defn git-diff ()
-  (exec "git diff"))
-```
-
-### JSON format
-
-```json
-{
-  "name": "docker",
-  "description": "Docker management",
-  "prompt": "You are a Docker expert...",
-  "commands": {
-    "docker-ps": "exec \"docker ps -a\"",
-    "docker-logs": "exec \"docker logs --tail 50\""
-  }
-}
-```
-
-### Built-in skills
-
-| Skill | Description |
-|-------|-------------|
-| `git` | Git operations — status, log, diff, commit, branch, stash |
-| `docker` | Container management — ps, images, logs, stats |
-| `project` | Code analysis — tree, language stats, TODOs, dependencies |
-| `research` | Web research — fetch pages, JSON, links |
-
-## Security
-
-lai includes a security layer that checks code before execution.
-
-### Modes
-
-| Mode | Behavior |
-|------|----------|
-| `off` | No restrictions |
-| `confirm` | Prompts before dangerous operations (default) |
-| `strict` | Blocks dangerous operations entirely |
-
-### Configuration
-
-```lisp
-(def security-mode "confirm")
-
-;; Network control
-(def security-allow-network true)
-(def security-blocked-domains (quote ("malicious.com")))
-(def security-allowed-domains (quote ("api.github.com" "httpbin.org")))
-
-;; Dangerous operations
-(def security-require-confirm-rm true)
-(def security-require-confirm-sudo true)
-(def security-require-confirm-write-system true)
-(def security-require-confirm-eval true)
-
-;; Blocked commands (always blocked in strict mode)
-(def security-blocked-commands (quote ("rm -rf /" "mkfs" ":(){ :|:& };:")))
-
-;; Blocked alisp functions (always blocked in strict mode)
-(def security-blocked-functions (quote ("exit" "setenv")))
-
-;; System paths (blocked from writes)
-(def security-blocked-paths (quote ("/etc" "/boot" "/sys" "/proc")))
-
-;; Sandbox: restrict file writes to these paths
-(def security-sandbox-paths (quote ("/home/user/projects")))
-
-;; Rate limiting
-(def security-max-ops-per-turn 50)
-
-;; Output size limit
-(def security-max-output-bytes 1048576)  ;; 1MB
-
-;; Audit logging
-(def security-audit-log "/tmp/lai-audit.log")
-```
-
-### What it checks
-
-| Check | Confirm | Strict |
-|-------|---------|--------|
-| `rm` commands | prompt | prompt |
-| `sudo` | prompt | blocked |
-| `eval` | prompt | blocked |
-| System path writes | prompt | prompt |
-| Blocked commands | blocked | blocked |
-| Blocked functions | prompt | blocked |
-| Sandbox violations | prompt | prompt |
-| Domain blocklist | blocked | blocked |
-| Domain allowlist | blocked | blocked |
-| Rate limit (ops/turn) | blocked | blocked |
-| Output size limit | truncated | truncated |
-
-### Example
-
-```
-⚠ security: file deletion (rm) detected in: (exec "rm -rf build/")
-  allow? [y/N]
+# OpenRouter
+OPENAI_API_KEY=your-key cargo run -- --openai https://openrouter.ai/api/v1 anthropic/claude-3.5-sonnet
 ```
 
 ## How It Works
 
 ```
-User → Agent → LLM → alisp code block → execute → result → LLM → ...
-```
-
-1. User sends a message
-2. LLM responds, optionally with ```` ```alisp ```` blocks
-3. Agent extracts and executes the code via alisp
-4. Results fed back to LLM as context
-5. Loop until the model produces a final answer
-
-### Features
-
-- **Streaming** — Tokens displayed in real-time as the model generates them
-- **State persistence** — Variables defined with `(def ...)` survive across conversation turns
-- **Context management** — Automatic truncation when conversation exceeds token limit
-- **Skills** — Extensible with custom alisp functions and instructions
-- **Security** — Pre-flight checks and confirmation prompts for dangerous operations
-- **Multiple backends** — llama.cpp, OpenAI, or interactive stdin
-
-## Example Session
-
-```
-you> what files are in the current directory?
+you> list files in this directory
 
 > (exec "ls")
 src/  Cargo.toml  README.md  ...
@@ -225,66 +35,59 @@ src/  Cargo.toml  README.md  ...
 > The project contains src/, Cargo.toml, and README.md.
 ```
 
-## Architecture
+1. You send a message
+2. LLM responds with text + optional `` ```alisp `` code blocks
+3. Agent executes the code and feeds results back
+4. Loop until final answer
 
-```
-src/
-  main.rs        CLI entry point, backend selection, REPL
-  agent.rs       Agent loop (think → alisp → observe)
-  tools.rs       alisp evaluator wrapper
-  security.rs    Security policy and pre-flight checks
-  skills.rs      Skill loading from directories
-  config.rs      ~/.lai/config.alisp parser
-  llm/
-    mod.rs       LlmBackend trait with streaming support
-    stdin.rs     Interactive stdin backend
-    llamacpp.rs  llama.cpp /v1/chat/completions
-    openai.rs    OpenAI API with SSE streaming
-```
+## Features
 
-## Adding a Backend
+- **Streaming** — Real-time token display
+- **Per-project memory** — SQLite database in each project directory
+- **Skills** — Extensible with `.alisp` or `.json` files
+- **Security** — Pre-flight checks and confirmation prompts
+- **Multiple backends** — llama.cpp, OpenAI, OpenRouter, or stdin
 
-Implement the `LlmBackend` trait:
+## Configuration
 
-```rust
-struct MyBackend;
+lai looks for config in this order:
+1. `lai.alisp` in current directory
+2. `lai.alisp` in parent directories
+3. `~/.lai/config.alisp`
 
-impl LlmBackend for MyBackend {
-    fn complete(&mut self, messages: &[Message]) -> Result<String, String> {
-        // call your LLM here
-    }
-
-    fn complete_streaming(
-        &mut self,
-        messages: &[Message],
-        on_token: &mut dyn FnMut(&str),
-    ) -> Result<String, String> {
-        // stream tokens, call on_token for each chunk
-    }
-}
+```lisp
+(def backend-type "openai")
+(def backend-url "https://openrouter.ai/api/v1")
+(def backend-model "anthropic/claude-3.5-sonnet")
 ```
 
-## Creating a Skill
+## Skills
 
-Create a `.alisp` or `.json` file in `~/.lai/skills/` or `./skills/`:
+Place `.alisp` or `.json` files in `~/.lai/skills/` or `./skills/`:
 
-```bash
-# Simple skill
-cat > ~/.lai/skills/my-skill.alisp << 'EOF'
-; name: my-skill
-; description: My custom skill
-; prompt: You have access to (my-command).
+```lisp
+; name: git
+; description: Git operations
+; prompt: You are a git expert.
 
-(defn my-command ()
-  (exec "echo hello from my skill"))
-EOF
+(defn git-status ()
+  (exec "git status"))
 ```
 
-Restart lai to load the new skill.
+## Memory
+
+Each project gets its own `memory.db` SQLite database. The agent can store and query facts, knowledge, and conversation history using SQL through alisp.
+
+## Security
+
+Three modes: `off`, `confirm` (default), `strict`. Configurable via `lai.alisp`.
+
+## Documentation
+
+See [docs/docs.md](docs/docs.md) for detailed documentation.
 
 ## Dependencies
 
-- [alisp](https://github.com/jihoo12/alisp) — Lisp interpreter for AI agents (also used for config)
+- [alisp](https://github.com/jihoo12/alisp) — Lisp interpreter
+- [rusqlite](https://github.com/rusqlite/rusqlite) — SQLite
 - [ureq](https://github.com/algesten/ureq) — HTTP client
-- [serde](https://serde.rs/) — Serialization
-- [regex](https://docs.rs/regex) — Pattern matching for security checks
