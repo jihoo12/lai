@@ -43,6 +43,7 @@ struct Choice {
 #[derive(Deserialize)]
 struct ChatResponseMessage {
     content: Option<String>,
+    reasoning: Option<String>,
 }
 
 fn make_agent() -> ureq::Agent {
@@ -146,7 +147,7 @@ impl LlmBackend for OpenAIBackend {
 
         resp.choices
             .first()
-            .and_then(|c| c.message.content.clone())
+            .and_then(|c| c.message.content.clone().or(c.message.reasoning.clone()))
             .ok_or_else(|| "empty response".to_string())
     }
 
@@ -179,9 +180,12 @@ impl LlmBackend for OpenAIBackend {
                 if let Some(choices) = chunk.get("choices").and_then(|c| c.as_array()) {
                     if let Some(choice) = choices.first() {
                         if let Some(delta) = choice.get("delta") {
-                            if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
-                                full_response.push_str(content);
-                                on_token(content);
+                            let token = delta.get("content")
+                                .and_then(|c| c.as_str())
+                                .or_else(|| delta.get("reasoning").and_then(|r| r.as_str()));
+                            if let Some(token) = token {
+                                full_response.push_str(token);
+                                on_token(token);
                             }
                         }
                     }

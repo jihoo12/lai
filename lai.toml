@@ -1,0 +1,63 @@
+# lai configuration file
+# Place this as lai.toml in your project root or ~/.lai/config.toml
+
+[backend]
+# "llama" for llama.cpp, "openai" for OpenAI/OpenRouter/etc
+type = "openai"
+
+# API base URL (appends /chat/completions automatically)
+# OpenAI:    https://api.openai.com/v1
+# OpenRouter: https://openrouter.ai/api/v1
+# llama.cpp: http://localhost:8080/v1
+url = "https://openrouter.ai/api/v1"
+
+# Model name (provider-specific)
+# OpenRouter examples: anthropic/claude-3.5-sonnet, openai/gpt-4o, meta-llama/llama-3.1-70b-instruct
+# Free models: google/gemma-4-31b-it:free, nvidia/nemotron-3-super-120b-a12b:free
+# OpenAI examples: gpt-4o, gpt-4o-mini, o1
+model = "google/gemma-4-26b-a4b-it:free"
+
+temperature = 0.7    # 0.0 = deterministic, 1.0 = creative
+max_tokens = 4096    # max response length
+
+[agent]
+max_turns = 20           # max code-execute loops per query
+max_context_tokens = 8192  # truncate history when exceeded
+
+[security]
+# "off" = no checks
+# "confirm" = prompt before dangerous ops
+# "strict" = block dangerous ops
+mode = "Confirm"
+
+# Network
+allow_network = true
+blocked_domains = []                    # block these domains
+allowed_domains = []                    # empty = allow all (if allow_network=true)
+
+# Dangerous operations
+require_confirm_rm = true               # confirm before rm
+require_confirm_sudo = true             # confirm before sudo
+require_confirm_write_system = true     # confirm before writing to /etc, /boot, etc.
+require_confirm_eval = true             # confirm before (eval)
+
+# Blocked commands (always blocked in strict mode)
+blocked_commands = ["rm -rf /", "mkfs", ":(){ :|:& };:"]
+
+# Blocked alisp functions (always blocked in strict mode)
+blocked_functions = ["exit", "setenv"]
+
+# System paths (blocked from writes)
+blocked_paths = ["/etc", "/boot", "/sys", "/proc"]
+
+# Sandbox: restrict file writes to these paths (empty = disabled)
+sandbox_paths = []
+
+# Rate limiting
+max_ops_per_turn = 50       # max alisp operations per turn
+
+# Output size limit (bytes)
+max_output_bytes = 1048576  # 1MB
+
+# Audit log (empty = disabled)
+audit_log = ""

@@ -51,19 +51,28 @@ model = "anthropic/claude-3.5-sonnet"
 
 ## Configuration
 
-Create `~/.lai/config.toml`:
+lai looks for config in this order:
+1. `lai.toml` in the current directory
+2. `lai.toml` in parent directories (walks up to `/`)
+3. `~/.lai/config.toml` (global fallback)
+
+Create a `lai.toml` in your project root:
 
 ```toml
 [backend]
-type = "openai"        # "llama" or "openai"
-url = "https://api.openai.com/v1"  # or https://openrouter.ai/api/v1
-model = "gpt-4o"
+type = "openai"
+url = "https://openrouter.ai/api/v1"
+model = "anthropic/claude-3.5-sonnet"
 temperature = 0.7
 max_tokens = 4096
 
 [agent]
 max_turns = 20
 max_context_tokens = 8192
+
+[security]
+mode = "Confirm"
+allow_network = true
 ```
 
 Environment variables:

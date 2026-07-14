@@ -84,7 +84,7 @@ fn default_max_context_tokens() -> usize {
 
 impl Config {
     pub fn load() -> Self {
-        let config_path = config_path();
+        let config_path = find_config();
         match std::fs::read_to_string(&config_path) {
             Ok(content) => toml::from_str(&content).unwrap_or_else(|e| {
                 eprintln!("warning: failed to parse {}: {}", config_path.display(), e);
@@ -95,7 +95,18 @@ impl Config {
     }
 }
 
-fn config_path() -> PathBuf {
+fn find_config() -> PathBuf {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    let mut dir = Some(cwd.as_path());
+    while let Some(current) = dir {
+        let candidate = current.join("lai.toml");
+        if candidate.is_file() {
+            return candidate;
+        }
+        dir = current.parent();
+    }
+
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".lai").join("config.toml")
 }
