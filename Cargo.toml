@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alisp = { git = "https://github.com/lai-agent/alisp" }
+alisp = { git = "https://github.com/jihoo12/alisp" }
 #alisp = { path = "/home/jihoo/alisp" }
 ureq = { version = "3", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
