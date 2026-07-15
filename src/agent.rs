@@ -8,6 +8,41 @@ use std::collections::HashSet;
 
 const SYSTEM_PROMPT: &str = include_str!("../prompt.md");
 
+const SELF_IMPROVE_PROMPT: &str = r#"You are reviewing your own conversation history to improve your behavior.
+
+## Your Task
+
+Analyze the recent conversation and write/update your Code of Conduct. This is a set of guidelines that will be injected into your system prompt for future conversations.
+
+## Rules for Code of Conduct
+
+1. Keep it concise (under 500 words)
+2. Focus on behavioral patterns, not technical details
+3. Include lessons learned from mistakes
+4. Include what worked well
+5. Be specific and actionable
+
+## Output Format
+
+Write ONLY the code of conduct text. Do not include any preamble or explanation.
+
+Example:
+```
+## Code of Conduct
+
+### Communication
+- Be concise and direct
+- Ask clarifying questions when requirements are ambiguous
+
+### Code Quality
+- Always check existing code before adding new features
+- Run tests after making changes
+
+### Problem Solving
+- Break complex tasks into smaller steps
+- Verify assumptions before implementing
+```"#;
+
 /// Rough token estimation: ~4 chars per token for English text.
 fn estimate_tokens(text: &str) -> usize {
     text.len() / 4
@@ -20,6 +55,8 @@ pub struct Agent {
     max_turns: u32,
     max_context_tokens: usize,
     loaded_skills: HashSet<String>,
+    self_improve: bool,
+    user_turn_count: usize,
 }
 
 impl Agent {
@@ -55,6 +92,20 @@ impl Agent {
 
         system_prompt.push_str(&Skill::skill_index(skills));
 
+        // Load existing code of conduct from memory
+        if config.self_improve {
+            if let Ok(result) = tools.execute(
+                r#"(sql-query "SELECT content FROM code_of_conduct ORDER BY version DESC LIMIT 1")"#
+            ) {
+                if let Some(content) = extract_first_cell(&result) {
+                    if !content.is_empty() && content != "nil" {
+                        system_prompt.push_str(&format!("\n\n{}", content));
+                        eprintln!("self-improve: loaded existing code of conduct");
+                    }
+                }
+            }
+        }
+
         Self {
             messages: vec![Message {
                 role: Role::System,
@@ -65,6 +116,8 @@ impl Agent {
             max_turns: config.max_turns,
             max_context_tokens: config.max_context_tokens,
             loaded_skills,
+            self_improve: config.self_improve,
+            user_turn_count: 0,
         }
     }
 
@@ -93,10 +146,7 @@ impl Agent {
         }
 
         if new_count > 0 {
-            // Rebuild skill index with all skills
             let index = Skill::skill_index(skills);
-
-            // Find and replace the old skill index in the system prompt
             let sys_msg = &mut self.messages[0].content;
             if let Some(pos) = sys_msg.find("\n## Available Skills") {
                 sys_msg.truncate(pos);
@@ -114,6 +164,100 @@ impl Agent {
 
     fn total_tokens(&self) -> usize {
         self.messages.iter().map(|m| estimate_tokens(&m.content)).sum()
+    }
+
+    /// Perform self-improvement: analyze conversation and update code of conduct.
+    fn self_improve(&mut self, backend: &mut dyn LlmBackend) {
+        eprintln!("self-improve: analyzing conversation...");
+
+        // Gather recent conversation history (last 10 user/assistant exchanges)
+        let history = self.messages[1..]
+            .iter()
+            .rev()
+            .take(20)
+            .map(|m| {
+                let role = match m.role {
+                    Role::User => "User",
+                    Role::Assistant => "Assistant",
+                    Role::Tool => "Tool",
+                    _ => "System",
+                };
+                format!("{}: {}", role, m.content)
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        // Get existing code of conduct
+        let existing_coc = if let Ok(result) = self.tools.execute(
+            r#"(sql-query "SELECT content FROM code_of_conduct ORDER BY version DESC LIMIT 1")"#
+        ) {
+            extract_first_cell(&result).unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        // Build the reflection prompt
+        let reflection_prompt = format!(
+            "{}\n\n## Existing Code of Conduct\n{}\n\n## Recent Conversation\n{}\n\nBased on this conversation, write an improved Code of Conduct. Focus on lessons learned and behavioral patterns.",
+            SELF_IMPROVE_PROMPT,
+            if existing_coc.is_empty() || existing_coc == "nil" {
+                "(No existing code of conduct)"
+            } else {
+                &existing_coc
+            },
+            history
+        );
+
+        // Create a temporary message list for the LLM call
+        let reflection_messages = vec![
+            Message {
+                role: Role::System,
+                content: "You are an AI agent reviewing your own behavior to improve. Be concise and actionable.".to_string(),
+            },
+            Message {
+                role: Role::User,
+                content: reflection_prompt,
+            },
+        ];
+
+        // Get LLM response (non-streaming)
+        match backend.complete(&reflection_messages) {
+            Ok(new_coc) => {
+                let new_coc = new_coc.trim().to_string();
+                if new_coc.is_empty() {
+                    eprintln!("self-improve: LLM returned empty response");
+                    return;
+                }
+
+                // Store in memory
+                let escaped_coc = new_coc.replace('\'', "''");
+                let sql = format!(
+                    "INSERT INTO code_of_conduct (version, content, reason) VALUES ((SELECT COALESCE(MAX(version), 0) + 1 FROM code_of_conduct), '{}', 'auto-improved from conversation')",
+                    escaped_coc
+                );
+
+                if let Err(e) = self.tools.execute(&sql) {
+                    eprintln!("self-improve: failed to store code of conduct: {}", e);
+                    return;
+                }
+
+                // Update system prompt
+                let sys_msg = &mut self.messages[0].content;
+                if let Some(pos) = sys_msg.find("\n## Code of Conduct") {
+                    sys_msg.truncate(pos);
+                }
+                sys_msg.push_str("\n\n");
+                sys_msg.push_str(&new_coc);
+
+                eprintln!("self-improve: code of conduct updated");
+            }
+            Err(e) => {
+                eprintln!("self-improve: LLM error: {}", e);
+            }
+        }
     }
 
     fn truncate_context(&mut self) {
@@ -161,6 +305,7 @@ impl Agent {
             content: user_input.to_string(),
         });
 
+        self.maybe_self_improve(backend);
         self.truncate_context();
 
         self.run_loop(backend, None)
@@ -177,9 +322,24 @@ impl Agent {
             content: user_input.to_string(),
         });
 
+        self.maybe_self_improve(backend);
         self.truncate_context();
 
         self.run_loop(backend, Some(on_token))
+    }
+
+    /// Check if self-improvement should be triggered (every 5 user turns).
+    fn maybe_self_improve(&mut self, backend: &mut dyn LlmBackend) {
+        if !self.self_improve {
+            return;
+        }
+
+        self.user_turn_count += 1;
+
+        // Trigger every 5 user turns, and only if we have enough history
+        if self.user_turn_count % 5 == 0 && self.messages.len() > 10 {
+            self.self_improve(backend);
+        }
     }
 
     fn run_loop(
@@ -259,4 +419,32 @@ fn extract_alisp_blocks(text: &str) -> Vec<String> {
     }
 
     blocks
+}
+
+/// Extract the first cell value from a SQL query result string.
+/// Result format: ((columns...) (row1...) (row2...) ...)
+fn extract_first_cell(result: &str) -> Option<String> {
+    // Find the first row after the header
+    // Result looks like: ((col1 col2) (val1 val2) ...)
+    let trimmed = result.trim();
+
+    // Find first ( after the header
+    let header_end = trimmed.find(") (");
+    if header_end == None {
+        return None;
+    }
+    let row_start = header_end.unwrap() + 3;
+
+    // Extract the row content
+    let row = &trimmed[row_start..];
+    let row_end = row.find(')');
+    if row_end == None {
+        return None;
+    }
+
+    let cell = &row[..row_end.unwrap()];
+    // Remove leading/trailing quotes if present
+    let cell = cell.trim();
+    let cell = cell.trim_matches('"');
+    Some(cell.to_string())
 }

@@ -22,6 +22,7 @@
 ;; Agent
 (def agent-max-turns 20)              ;; max code-execute loops per query
 (def agent-max-context-tokens 8192)   ;; truncate history when exceeded
+(def agent-self-improve false)        ;; self improve
 
 ;; Security
 ;; "off" = no checks

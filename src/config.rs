@@ -19,6 +19,7 @@ pub struct BackendConfig {
 pub struct AgentConfig {
     pub max_turns: u32,
     pub max_context_tokens: usize,
+    pub self_improve: bool,
 }
 
 impl Default for BackendConfig {
@@ -38,6 +39,7 @@ impl Default for AgentConfig {
         Self {
             max_turns: 20,
             max_context_tokens: 8192,
+            self_improve: false,
         }
     }
 }
@@ -96,6 +98,7 @@ fn parse_alisp_config(content: &str) -> Result<Config, String> {
     let agent = AgentConfig {
         max_turns: get_u32(&eval, "agent-max-turns", 20),
         max_context_tokens: get_usize(&eval, "agent-max-context-tokens", 8192),
+        self_improve: get_bool(&eval, "agent-self-improve", false),
     };
 
     let security = SecurityConfig {

@@ -274,6 +274,72 @@ CREATE TABLE knowledge (
 (sql-execute "INSERT INTO memories (category, key, value, importance) VALUES ('decision', 'state_management', 'Zustand over Redux', 8)")
 ```
 
+## Self-Improvement
+
+When enabled, the agent periodically reflects on its own behavior and updates a "Code of Conduct" that improves over time.
+
+### Configuration
+
+Enable in `lai.alisp`:
+
+```lisp
+(def agent-self-improve true)
+```
+
+### How It Works
+
+1. **Trigger**: Every 5 user turns, the agent pauses to reflect
+2. **Analysis**: Reviews last 20 messages from conversation history
+3. **Judgment**: Identifies what went well, what went wrong, and patterns to change
+4. **Storage**: Writes improved Code of Conduct to `code_of_conduct` table in memory.db
+5. **Integration**: Updates system prompt with new Code of Conduct
+
+### Code of Conduct Table
+
+```sql
+CREATE TABLE code_of_conduct (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  version INTEGER NOT NULL DEFAULT 1,
+  content TEXT NOT NULL,
+  reason TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+)
+```
+
+Each improvement creates a new version, allowing you to track how the agent's behavior evolves over time.
+
+### What It Tracks
+
+- **Communication patterns**: What worked, what didn't
+- **Code quality lessons**: Mistakes to avoid
+- **Problem-solving approaches**: Strategies that succeeded
+- **User preferences**: Discovered during conversation
+- **Behavioral improvements**: Concrete changes for future conversations
+
+### Example Flow
+
+```
+Turn 1-5: Normal conversation
+Turn 5: Agent triggers self-improvement
+  → Analyzes conversation history
+  → Generates Code of Conduct v1
+  → Stores in memory.db
+  → Updates system prompt
+
+Turn 6-10: Conversation continues with improved behavior
+Turn 10: Agent triggers self-improvement
+  → Reviews new conversation + existing Code of Conduct
+  → Generates improved Code of Conduct v2
+  → Behavior evolves over time
+```
+
+### Persistence
+
+Code of Conduct is stored in the project's `memory.db`, so:
+- It persists across conversations
+- It's scoped to the current project
+- It evolves as the agent learns from each interaction
+
 ## Security
 
 lai includes a security layer that checks alisp code before execution.
@@ -381,4 +447,74 @@ alisp is a Lisp dialect designed for AI agents. See the full reference in the [a
 
 **SQL:** `sql-execute`, `sql-query`, `sql-tables`, `sql-schema`
 
+**HTML:** `html-select`, `html-text`, `html-attr`, `html-links`, `html-title`, `html-meta`, `html-meta-all`, `html-tables`, `html-images`, `html-forms`
+
 **Misc:** `sleep`, `time`, `timestamp`, `exit`
+
+### HTML Parsing
+
+lai includes a full HTML parser with CSS selector support for web scraping and data extraction.
+
+#### Functions
+
+| Function | Description |
+|----------|-------------|
+| `(html-select html css)` | Select elements by CSS selector, returns list of HTML strings |
+| `(html-text html css)` | Extract text content from matching elements |
+| `(html-attr html css "attr")` | Extract attribute values from matching elements |
+| `(html-links html)` | Extract all links as `((text url) ...)` pairs |
+| `(html-title html)` | Extract page title |
+| `(html-meta html "name")` | Extract meta tag content by name or property |
+| `(html-meta-all html)` | Extract all meta tags as `((name content) ...)` |
+| `(html-tables html)` | Extract tables as nested lists of rows and cells |
+| `(html-images html)` | Extract images as `((alt src) ...)` pairs |
+| `(html-forms html)` | Extract forms with their input fields |
+
+#### CSS Selector Syntax
+
+| Selector | Description |
+|----------|-------------|
+| `a` | All anchor elements |
+| `h1, h2, h3` | Multiple element types |
+| `.classname` | Elements with class |
+| `#id` | Element by ID |
+| `div.content` | Element with class |
+| `table tr td` | Nested elements |
+| `meta[name='description']` | Attribute selector |
+| `a[href^='https']` | Prefix attribute selector |
+
+#### Examples
+
+```alisp
+;; Fetch and parse a web page
+(def html (http-get "https://example.com"))
+
+;; Get page title
+(html-title html)
+; => "Example Domain"
+
+;; Extract all links
+(html-links html)
+; => (("More information..." "https://example.com/more"))
+
+;; Get all headings
+(html-text html "h1, h2, h3")
+
+;; Extract meta description
+(html-meta html "description")
+
+;; Get all images
+(html-images html)
+
+;; Extract table data
+(def tables (html-tables html))
+; => (((("Header1" "Header2") ("Cell1" "Cell2"))))
+
+;; Get element attributes
+(html-attr html "a" "href")
+; => ("https://example.com/more")
+
+;; Combine with data processing
+(dolist (link (html-links html))
+  (println (car link) " -> " (car (cdr link))))
+```

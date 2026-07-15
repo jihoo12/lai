@@ -190,6 +190,30 @@ Object (assoc list) helpers:
 (http-delete "url")                           ; DELETE
 (http "METHOD" "url" ?body? ?headers-list?)   ; full control
 
+## HTML Parsing
+
+Use these functions to parse and extract data from HTML pages.
+
+(html-select html css)        ; select elements, returns list of HTML strings
+(html-text html css)          ; extract text content from elements
+(html-attr html css "attr")   ; extract attribute values from elements
+(html-links html)             ; extract all links as ((text url) ...)
+(html-title html)             ; extract page title
+(html-meta html "name")       ; extract meta tag content by name
+(html-meta-all html)          ; extract all meta tags as ((name content) ...)
+(html-tables html)            ; extract tables as list of (rows...) of (cells...)
+(html-images html)            ; extract images as ((alt src) ...)
+(html-forms html)             ; extract forms with inputs
+
+CSS selector examples:
+- "a" — all links
+- "h1, h2, h3" — all headings
+- ".class-name" — elements with class
+- "#id" — element by id
+- "div.content" — div with class content
+- "table tr td" — table cells
+- "meta[name='description']" — specific meta tag
+
 ## JSON
 
 JSON <-> alisp mapping: null<->nil, true/false<->true/false, number<->number, string<->string, array<->list, object<->(("key" val) ...)
@@ -302,3 +326,44 @@ Always explain what you are doing before and after running code.
 ## Skills
 
 When you write a `.alisp` or `.json` file to a skills directory (`skills/` or `~/.lai/skills/`), it is automatically loaded — no need to manually `(read)` and `(eval)` it. Just write the file and the skill will be available on the next turn.
+
+## Self-Improvement
+
+When `agent-self-improve` is enabled in config, the agent periodically reflects on its own behavior and updates a "Code of Conduct" stored in memory.db.
+
+### How It Works
+
+1. Every 5 user turns, the agent analyzes recent conversation history
+2. It judges its own performance and identifies patterns
+3. It writes/updates a Code of Conduct with lessons learned
+4. The Code of Conduct is injected into the system prompt for future conversations
+
+### Configuration
+
+Enable in `lai.alisp`:
+
+```lisp
+(def agent-self-improve true)
+```
+
+### Code of Conduct Table
+
+```sql
+CREATE TABLE code_of_conduct (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  version INTEGER NOT NULL DEFAULT 1,
+  content TEXT NOT NULL,
+  reason TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+)
+```
+
+### What It Tracks
+
+- Communication patterns (what worked, what didn't)
+- Code quality lessons
+- Problem-solving approaches
+- User preferences discovered during conversation
+- Mistakes to avoid in the future
+
+The agent's behavior evolves over time as it learns from each conversation.

@@ -128,6 +128,17 @@ impl MemoryManager {
   (sql-execute "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)")
   (sql-execute "CREATE INDEX IF NOT EXISTS idx_knowledge_domain ON knowledge(domain)")
 
+  ;; Code of conduct for self-improvement
+  (sql-execute "
+    CREATE TABLE IF NOT EXISTS code_of_conduct (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version INTEGER NOT NULL DEFAULT 1,
+      content TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  ")
+
   ;; Store project context
   (sql-execute "INSERT OR IGNORE INTO memories (category, key, value) VALUES ('context', 'project_dir', '{project}')")
 

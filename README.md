@@ -44,6 +44,7 @@ src/  Cargo.toml  README.md  ...
 
 - **Streaming** — Real-time token display
 - **Per-project memory** — SQLite database in each project directory
+- **Self-improvement** — Agent reflects on its behavior and evolves over time
 - **Skills** — Extensible with `.alisp` or `.json` files
 - **Security** — Pre-flight checks and confirmation prompts
 - **Multiple backends** — llama.cpp, OpenAI, OpenRouter, or stdin
@@ -59,6 +60,9 @@ lai looks for config in this order:
 (def backend-type "openai")
 (def backend-url "https://openrouter.ai/api/v1")
 (def backend-model "anthropic/claude-3.5-sonnet")
+
+;; Self-improvement (agent reflects on its behavior)
+(def agent-self-improve true)
 ```
 
 ## Skills
